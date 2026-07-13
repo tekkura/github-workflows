@@ -116,8 +116,9 @@ jobs:
             const prAuthorAssociation = issue.author_association || pr.author_association || '';
             const headRef = pr.head?.ref || '';
             const baseRef = pr.base?.ref || '';
+            const sameRepoPullRequest = pr.head?.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`;
             const commentAuthorTrusted = expectedAssociations.includes(receivedCommentAuthorAssociation);
-            const prAuthorTrusted = expectedAssociations.includes(prAuthorAssociation);
+            const prAuthorTrusted = expectedAssociations.includes(prAuthorAssociation) || sameRepoPullRequest;
             const commandGatePassed = !isIssueComment || (isPullRequestComment && commentCommandMatches);
             const trustGatePassed = isIssueComment ? commentAuthorTrusted : prAuthorTrusted;
             const shouldRunDownstream = commandGatePassed && trustGatePassed;
@@ -137,6 +138,7 @@ jobs:
             core.info(`Gate check: expected issue_comment on PR=true, received ${String(isPullRequestComment)}`);
             core.info(`Gate check: expected association in [${expectedAssociations.join(', ')}]`);
             core.info(`Gate check: PR author association="${prAuthorAssociation}", comment author association="${receivedCommentAuthorAssociation}"`);
+            core.info(`Gate check: same-repository PR=${String(sameRepoPullRequest)}`);
             core.info(`Gate evaluation: commandGatePassed=${String(commandGatePassed)}, trustGatePassed=${String(trustGatePassed)}, shouldRunDownstream=${String(shouldRunDownstream)}, gateReason="${gateReason}"`);
 
             core.setOutput('pull_number', String(pr.number));
