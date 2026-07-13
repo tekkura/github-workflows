@@ -80,24 +80,30 @@ jobs:
             const receivedCommentBody = context.payload.comment?.body ?? '';
             const receivedCommentAuthorAssociation = context.payload.comment?.author_association ?? '';
             const commentCommandMatches = receivedCommentBody === expectedCommand;
-            let pr = context.payload.pull_request;
+            let pullNumber = context.payload.pull_request?.number;
 
-            if (!pr && eventName === 'issue_comment') {
+            if (!pullNumber && eventName === 'issue_comment') {
               if (!context.payload.issue?.pull_request) {
                 core.setFailed('issue_comment is not on a pull request');
                 return;
               }
-              const pull_number = context.issue.number;
-              const response = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number,
-              });
-              pr = response.data;
+              pullNumber = context.issue.number;
             }
 
+            if (!pullNumber) {
+              core.setFailed('Unable to resolve pull request number from event payload');
+              return;
+            }
+
+            const response = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            });
+            const pr = response.data;
+
             if (!pr) {
-              core.setFailed('Unable to resolve pull request context from event payload');
+              core.setFailed('Unable to resolve pull request context from GitHub API');
               return;
             }
 
