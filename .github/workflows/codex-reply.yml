@@ -41,7 +41,8 @@ jobs:
             const commentId = comment?.id ? String(comment.id) : '';
             const body = comment?.body || '';
             const commandMatches = body.startsWith(expectedCommand);
-            let association = comment?.author_association || '';
+            const eventAssociation = comment?.author_association || '';
+            let association = eventAssociation;
             let allowedAssociations = [];
             let gateReason = 'ok';
 
@@ -55,14 +56,14 @@ jobs:
               core.warning(`Unable to parse allowed reply associations: ${err.message}`);
             }
 
-            if (!association && commentId) {
+            if (commentId && !allowedAssociations.includes(association)) {
               const response = await github.rest.pulls.getReviewComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: Number(commentId),
               });
               association = response.data.author_association || '';
-              core.info('Fetched review comment via REST because event payload did not include author_association.');
+              core.info('Fetched review comment via REST because event author_association was missing or not allowed.');
             }
 
             const trustedAuthor = allowedAssociations.includes(association);
@@ -83,7 +84,7 @@ jobs:
             core.info(`Gate comment_id: ${commentId}`);
             core.info(`Gate comment_body: ${body}`);
             core.info(`Gate command_matches: ${String(commandMatches)}`);
-            core.info(`Gate event_author_association: ${comment?.author_association || ''}`);
+            core.info(`Gate event_author_association: ${eventAssociation}`);
             core.info(`Gate resolved_author_association: ${association}`);
             core.info(`Gate allowed_associations_input: ${process.env.ALLOWED_REPLY_ASSOCIATIONS_JSON || ''}`);
             core.info(`Gate should_run: ${String(shouldRun)}`);
