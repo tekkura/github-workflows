@@ -43,6 +43,8 @@ jobs:
             const commandMatches = body.startsWith(expectedCommand);
             const eventAssociation = comment?.author_association || '';
             let association = eventAssociation;
+            let repoPermission = '';
+            let repoRoleName = '';
             let allowedAssociations = [];
             let gateReason = 'ok';
 
@@ -56,7 +58,7 @@ jobs:
               core.warning(`Unable to parse allowed reply associations: ${err.message}`);
             }
 
-            if (commentId && !allowedAssociations.includes(association)) {
+            if (comment && commandMatches && gateReason === 'ok' && commentId && !allowedAssociations.includes(association)) {
               const response = await github.rest.pulls.getReviewComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -66,7 +68,29 @@ jobs:
               core.info('Fetched review comment via REST because event author_association was missing or not allowed.');
             }
 
-            const trustedAuthor = allowedAssociations.includes(association);
+            let trustedAuthor = allowedAssociations.includes(association);
+            if (comment && commandMatches && gateReason === 'ok' && !trustedAuthor) {
+              const author = comment.user?.login || '';
+              if (author) {
+                try {
+                  const response = await github.rest.repos.getCollaboratorPermissionLevel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    username: author,
+                  });
+                  repoPermission = response.data.permission || '';
+                  repoRoleName = response.data.role_name || '';
+                  trustedAuthor = ['admin', 'write'].includes(repoPermission);
+                } catch (err) {
+                  if (err.status === 404) {
+                    core.info(`No repository permission found for "${author}".`);
+                  } else {
+                    core.warning(`Unable to resolve repository permission for "${author}": ${err.message}`);
+                  }
+                }
+              }
+            }
+
             let shouldRun = commandMatches && trustedAuthor && gateReason === 'ok';
 
             if (!comment) {
@@ -86,6 +110,8 @@ jobs:
             core.info(`Gate command_matches: ${String(commandMatches)}`);
             core.info(`Gate event_author_association: ${eventAssociation}`);
             core.info(`Gate resolved_author_association: ${association}`);
+            core.info(`Gate resolved_repo_permission: ${repoPermission}`);
+            core.info(`Gate resolved_repo_role_name: ${repoRoleName}`);
             core.info(`Gate allowed_associations_input: ${process.env.ALLOWED_REPLY_ASSOCIATIONS_JSON || ''}`);
             core.info(`Gate should_run: ${String(shouldRun)}`);
             core.info(`Gate reason: ${gateReason}`);
